@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import PropTypes from "prop-types";
 
-export const Comment = ({ content, date }) => {
+export const Comment = ({ content, date, blurred }) => {
   const formattedDate = new Date(date).toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -29,7 +29,13 @@ export const Comment = ({ content, date }) => {
         >
           {formattedDate}
         </span>
-        <p className={clsx("text-sm", "font-light")}>{content}</p>
+        <p
+          className={clsx("text-sm", "font-light", {
+            "blur-sm": blurred,
+          })}
+        >
+          {content}
+        </p>
       </div>
     </div>
   );
@@ -38,4 +44,5 @@ export const Comment = ({ content, date }) => {
 Comment.propTypes = {
   content: PropTypes.string.isRequired,
   date: PropTypes.string.isRequired,
+  blurred: PropTypes.bool,
 };

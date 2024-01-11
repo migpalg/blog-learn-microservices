@@ -33,6 +33,7 @@ export const CommentsList = ({ className, comments }) => {
           key={comment.id}
           content={comment.content}
           date={comment.updatedAt}
+          blurred={comment.status === "pending"}
         />
       ))}
     </div>
