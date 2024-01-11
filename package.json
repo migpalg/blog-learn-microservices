@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:services": "nx run-many --parallel --target dev --projects @blog/comments-service,@blog/moderation-service,@blog/posts-service,@blog/query-service"
   },
   "keywords": [],
   "author": "",
