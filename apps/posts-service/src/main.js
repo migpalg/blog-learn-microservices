@@ -1,9 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
-const { amqpConnect } = require("./core/amqp");
 const { config } = require("./core/config");
-const { constants } = require("./core/constants");
+const { amqpConnect, assertExchange } = require("@blog/amqp-utils");
 
 /**
  * @type {import("amqplib/callback_api").Channel}
@@ -21,6 +20,10 @@ const posts = new Map();
 async function main() {
   // Connect to RabbitMQ
   channel = await amqpConnect(config.rabbitmq.url);
+
+  await assertExchange(channel, config.rabbitmq.exchange, "topic", {
+    durable: false,
+  });
 
   // Create an express application
   const app = express();
@@ -54,11 +57,13 @@ async function main() {
 
     posts.set(targetId, newPost);
 
-    channel.sendToQueue(
-      config.rabbitmq.queue,
-      Buffer.from(
-        JSON.stringify({ type: constants.events.createPost, data: newPost })
-      )
+    // Raw data to send through RabbitMQ
+    const payload = Buffer.from(JSON.stringify(newPost));
+
+    channel.publish(
+      config.rabbitmq.exchange,
+      config.rabbitmq.keys.posts.create,
+      payload
     );
 
     res.status(201).json({
@@ -89,11 +94,10 @@ async function main() {
 
     posts.set(id, updatedPost);
 
-    channel.sendToQueue(
-      config.rabbitmq.queue,
-      Buffer.from(
-        JSON.stringify({ type: constants.events.updatePost, data: updatedPost })
-      )
+    channel.publish(
+      config.rabbitmq.exchange,
+      config.rabbitmq.keys.posts.update,
+      Buffer.from(JSON.stringify(updatedPost))
     );
 
     res.status(200).json({
