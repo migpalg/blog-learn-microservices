@@ -1,8 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { amqpConnect, assertChannel } = require("./core/amqp");
+const {
+  amqpConnect,
+  assertQueue,
+  assertExchange,
+} = require("@blog/amqp-utils");
 const { config } = require("./core/config");
-const { constants } = require("./core/constants");
 
 /**
  * @type {import("amqplib/callback_api").Channel}
@@ -14,49 +17,76 @@ const data = new Map();
 async function main() {
   channel = await amqpConnect(config.rabbitmq.url);
 
-  await assertChannel(channel, config.rabbitmq.queue);
+  await assertExchange(channel, config.rabbitmq.exchange, "topic", {
+    durable: false,
+  });
 
-  channel.consume(config.rabbitmq.queue, (msg) => {
+  const result = await assertQueue(channel, "", { exclusive: true });
+
+  channel.bindQueue(result.queue, config.rabbitmq.exchange, "posts.actions.*");
+  channel.bindQueue(
+    result.queue,
+    config.rabbitmq.exchange,
+    "comments.actions.*"
+  );
+
+  channel.consume(result.queue, (msg) => {
     if (!msg) return;
 
-    const event = JSON.parse(msg.content.toString());
-
-    if (event.type === constants.events.createPost) {
-      const content = event.data;
+    if (msg.fields.routingKey === config.rabbitmq.keys.posts.create) {
+      const content = JSON.parse(msg.content.toString());
 
       data.set(content.id, { ...content, comments: [] });
 
-      channel.ack(msg);
+      return;
     }
 
-    if (event.type === constants.events.createComment) {
-      const content = event.data;
-
-      const post = data.get(content.postId);
-
-      if (!post) {
-        channel.ack(msg);
-        return;
-      }
-
-      post.comments.push(content.comment);
-
-      channel.ack(msg);
-    }
-
-    if (event.type === constants.events.updatePost) {
-      const content = event.data;
+    if (msg.fields.routingKey === config.rabbitmq.keys.posts.update) {
+      const content = JSON.parse(msg.content.toString());
 
       const post = data.get(content.id);
 
       if (!post) {
-        channel.ack(msg);
         return;
       }
 
       data.set(content.id, { ...post, ...content });
 
-      channel.ack(msg);
+      return;
+    }
+
+    if (msg.fields.routingKey === config.rabbitmq.keys.comments.create) {
+      const content = JSON.parse(msg.content.toString());
+
+      const post = data.get(content.postId);
+
+      if (!post) {
+        return;
+      }
+
+      post.comments.push(content.comment);
+
+      return;
+    }
+
+    if (msg.fields.routingKey === config.rabbitmq.keys.comments.moderated) {
+      const content = JSON.parse(msg.content.toString());
+
+      const post = data.get(content.postId);
+
+      if (!post) {
+        return;
+      }
+
+      const comment = post.comments.find((c) => c.id === content.id);
+
+      if (!comment) {
+        return;
+      }
+
+      comment.status = content.status;
+
+      return;
     }
   });
 
