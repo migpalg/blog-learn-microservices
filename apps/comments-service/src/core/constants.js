@@ -1,6 +1,10 @@
 const constants = {
-  events: {
-    createComment: "blog/create-comment",
+  comments: {
+    status: {
+      pending: "pending",
+      approved: "approved",
+      rejected: "rejected",
+    },
   },
 };
 

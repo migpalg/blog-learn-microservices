@@ -1,7 +1,11 @@
 const cors = require("cors");
 const express = require("express");
 const { v4: uuidv4 } = require("uuid");
-const { amqpConnect } = require("./core/amqp");
+const {
+  amqpConnect,
+  assertExchange,
+  assertQueue,
+} = require("@blog/amqp-utils");
 const { config } = require("./core/config");
 const { constants } = require("./core/constants");
 
@@ -14,6 +18,38 @@ const commentsByPostId = new Map();
 
 async function main() {
   channel = await amqpConnect(config.rabbitmq.url, config.rabbitmq.queue);
+
+  await assertExchange(channel, config.rabbitmq.exchange, "topic", {
+    durable: false,
+  });
+
+  const result = await assertQueue(channel, "", { exclusive: true });
+
+  channel.bindQueue(
+    result.queue,
+    config.rabbitmq.exchange,
+    config.rabbitmq.keys.comments.moderated
+  );
+
+  channel.consume(result.queue, (msg) => {
+    if (!msg) return;
+
+    if (msg.fields.routingKey === config.rabbitmq.keys.comments.moderated) {
+      const content = JSON.parse(msg.content.toString());
+
+      const comments = commentsByPostId.get(content.postId);
+
+      if (!comments) return;
+
+      const comment = comments.find((c) => c.id === content.id);
+
+      if (!comment) return;
+
+      comment.status = content.status;
+
+      return;
+    }
+  });
 
   const app = express();
 
@@ -41,6 +77,7 @@ async function main() {
       id: targetId,
       createdAt: new Date(),
       updatedAt: new Date(),
+      status: constants.comments.status.pending,
       content,
     };
 
@@ -48,17 +85,17 @@ async function main() {
 
     commentsByPostId.get(postId).push(newComment);
 
-    channel.sendToQueue(
-      config.rabbitmq.queue,
-      Buffer.from(
-        JSON.stringify({
-          type: constants.events.createComment,
-          data: {
-            postId,
-            comment: newComment,
-          },
-        })
-      )
+    const payload = Buffer.from(
+      JSON.stringify({
+        postId,
+        comment: newComment,
+      })
+    );
+
+    channel.publish(
+      config.rabbitmq.exchange,
+      config.rabbitmq.keys.comments.create,
+      payload
     );
 
     res.status(201).send({
