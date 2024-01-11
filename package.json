@@ -7,8 +7,8 @@
     "dev:services": "nx run-many --parallel --target dev --projects @blog/comments-service,@blog/moderation-service,@blog/posts-service,@blog/query-service"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Miguel Palacio <migpalg@gmail.com>",
+  "license": "MIT",
   "devDependencies": {
     "nx": "17.2.7"
   }
