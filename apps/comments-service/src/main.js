@@ -23,7 +23,7 @@ async function main() {
     durable: false,
   });
 
-  const result = await assertQueue(channel, "", { exclusive: true });
+  const result = await assertQueue(channel, config.rabbitmq.queue);
 
   channel.bindQueue(
     result.queue,
