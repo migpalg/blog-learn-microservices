@@ -2,6 +2,7 @@ const config = {
   rabbitmq: {
     url: "amqp://localhost",
     exchange: "exchanges/blog",
+    queue: "queues/blog/moderation",
     keys: {
       posts: {
         create: "posts.actions.create",
